@@ -1,5 +1,3 @@
-local v0=game:GetService("Players");local v1=game:GetService("UserInputService");local v2=game:GetService("HttpService");local v3=v0.LocalPlayer;local v4=v3:WaitForChild("PlayerGui");local v5="restdesync";local v6="https://new.pandadevelopment.net/api/v1";local function v7() local v91=0 + 0 ;local v92;local v93;local v94;local v95;while true do if (v91==(0 + 0)) then local v120=0;while true do if (v120==(772 -(201 + 571))) then v92,v93=pcall(function() return gethwid();end);if (v92 and v93) then return v93;end v120=1;end if (v120==(1139 -(116 + 1022))) then v91=4 -3 ;break;end end end if (v91==(1 + 0)) then local v121=0 -0 ;while true do if (v121==1) then v91=7 -5 ;break;end if (0==v121) then v94=game:GetService("RbxAnalyticsService");v95=tostring(v94:GetClientId());v121=860 -(814 + 45) ;end end end if (v91==2) then return v95:gsub("-","");end end end local function v8(v96,v97) local v98=v6   .. v96 ;local v99=v2:JSONEncode(v97);local v100,v101=pcall(function() return request({Url=v98,Method="POST",Headers={["Content-Type"]="application/json"},Body=v99});end);if (v100 and v101 and v101.Body) then return v2:JSONDecode(v101.Body);end return nil;end local function v9() local v102=0 -0 ;local v103;while true do if (v102==0) then v103=v7();return "https://new.pandadevelopment.net/getkey/"   .. v5   .. "?hwid="   .. v103 ;end end end local function v10(v104) local v105=0;local v106;local v107;local v108;while true do if (v105==(1 + 0)) then if  not v107 then return {success=false,message="Verbindung fehlgeschlagen"};end v108=v107.Authenticated_Status=="Success" ;v105=1 + 1 ;end if (v105==(885 -(261 + 624))) then v106=v7();v107=v8("/keys/validate",{ServiceID=v5,HWID=v106,Key=v104});v105=1 -0 ;end if (v105==2) then return {success=v108,message=v107.Note or (v108 and "Key validiert!") or "Ungültiger Key" };end end end local v11=Instance.new("ScreenGui");v11.Name="DesyncAuthUI";v11.ResetOnSpawn=false;v11.Parent=v4;local v15=Instance.new("Frame");v15.Size=UDim2.new(0,220,0,100);v15.Position=UDim2.new(0.5, -110,0.5, -(1130 -(1020 + 60)));v15.BackgroundColor3=Color3.fromRGB(15,1438 -(630 + 793) ,84 -59 );v15.BorderSizePixel=0;v15.Active=true;v15.Visible=false;v15.Parent=v11;local v23=Instance.new("TextLabel");v23.Size=UDim2.new(4 -3 ,0 + 0 ,0 -0 ,1777 -(760 + 987) );v23.Position=UDim2.new(0,1913 -(1789 + 124) ,0,8);v23.BackgroundTransparency=767 -(745 + 21) ;v23.Text="Desync V Delta";v23.TextColor3=Color3.fromRGB(88 + 167 ,701 -446 ,255);v23.Font=Enum.Font.GothamBold;v23.TextSize=54 -40 ;v23.Parent=v15;local v33=false;local v34=Instance.new("TextButton");v34.Size=UDim2.new(0 + 0 ,180,0 + 0 ,1095 -(87 + 968) );v34.Position=UDim2.new(0.5 -0 , -(82 + 8),0 -0 ,48);v34.BackgroundColor3=Color3.fromRGB(1473 -(447 + 966) ,180,273 -173 );v34.Text="Desync";v34.TextColor3=Color3.fromRGB(2072 -(1703 + 114) ,956 -(376 + 325) ,417 -162 );v34.Font=Enum.Font.GothamSemibold;v34.TextSize=39 -26 ;v34.BorderSizePixel=0 + 0 ;v34.Parent=v15;local v45=Instance.new("Frame");v45.Size=UDim2.new(0 -0 ,250,14 -(9 + 5) ,526 -(85 + 291) );v45.Position=UDim2.new(1265.5 -(243 + 1022) , -(475 -350),0.5 + 0 , -75);v45.BackgroundColor3=Color3.fromRGB(1205 -(1123 + 57) ,25,29 + 6 );v45.BorderSizePixel=254 -(163 + 91) ;v45.Active=true;v45.Parent=v11;local v52=Instance.new("TextLabel");v52.Size=UDim2.new(1,0,1930 -(1869 + 61) ,12 + 28 );v52.Text="Authentication";v52.TextColor3=Color3.fromRGB(255,897 -642 ,391 -136 );v52.BackgroundTransparency=1 + 0 ;v52.Font=Enum.Font.GothamBold;v52.TextSize=21 -5 ;v52.Parent=v45;local v60=Instance.new("TextBox");v60.Size=UDim2.new(0 + 0 ,1674 -(1329 + 145) ,0,35);v60.Position=UDim2.new(971.5 -(140 + 831) , -(1950 -(1409 + 441)),0,763 -(15 + 703) );v60.BackgroundColor3=Color3.fromRGB(7 + 8 ,453 -(262 + 176) ,1741 -(345 + 1376) );v60.PlaceholderText="Paste Key Here...";v60.Text="";v60.TextColor3=Color3.fromRGB(943 -(198 + 490) ,1126 -871 ,611 -356 );v60.Font=Enum.Font.Gotham;v60.TextSize=1218 -(696 + 510) ;v60.BorderSizePixel=0;v60.ClearTextOnFocus=false;v60.Parent=v45;local v73=Instance.new("TextButton");v73.Size=UDim2.new(0 -0 ,1357 -(1091 + 171) ,0 + 0 ,35);v73.Position=UDim2.new(0.5 -0 , -(331 -231),0,90);v73.BackgroundColor3=Color3.fromRGB(60,554 -(123 + 251) ,496 -396 );v73.Text="Verify";v73.TextColor3=Color3.fromRGB(953 -(208 + 490) ,22 + 233 ,114 + 141 );v73.BorderSizePixel=836 -(660 + 176) ;v73.Parent=v45;local v81=Instance.new("TextButton");v81.Size=UDim2.new(0,12 + 83 ,202 -(14 + 188) ,35);v81.Position=UDim2.new(675.5 -(534 + 141) ,3 + 2 ,0,80 + 10 );v81.BackgroundColor3=Color3.fromRGB(50,49 + 1 ,126 -66 );v81.Text="Get Key";v81.TextColor3=Color3.fromRGB(404 -149 ,715 -460 ,137 + 118 );v81.BorderSizePixel=0 + 0 ;v81.Parent=v45;local function v89(v109) local v110=396 -(115 + 281) ;local v111;local v112;local v113;local v114;while true do if (v110==(0 -0)) then local v122=0 + 0 ;while true do if ((0 -0)==v122) then v111,v112,v113,v114=nil;v109.InputBegan:Connect(function(v135) if ((v135.UserInputType==Enum.UserInputType.MouseButton1) or (v135.UserInputType==Enum.UserInputType.Touch)) then local v136=0 -0 ;while true do if (v136==(868 -(550 + 317))) then v114=v109.Position;v135.Changed:Connect(function() if (v135.UserInputState==Enum.UserInputState.End) then v111=false;end end);break;end if (v136==0) then v111=true;v113=v135.Position;v136=1 -0 ;end end end end);v122=1;end if (v122==(1 -0)) then v110=2 -1 ;break;end end end if (v110==(286 -(134 + 151))) then v109.InputChanged:Connect(function(v126) if ((v126.UserInputType==Enum.UserInputType.MouseMovement) or (v126.UserInputType==Enum.UserInputType.Touch)) then v112=v126;end end);v1.InputChanged:Connect(function(v127) if ((v127==v112) and v111) then local v133=1665 -(970 + 695) ;local v134;while true do if ((0 -0)==v133) then v134=v127.Position-v113 ;v109.Position=UDim2.new(v114.X.Scale,v114.X.Offset + v134.X ,v114.Y.Scale,v114.Y.Offset + v134.Y );break;end end end end);break;end end end v89(v15);v89(v45);local function v90() local v115=0;while true do if (v115==(1990 -(582 + 1408))) then v45.Visible=false;v15.Visible=true;v115=3 -2 ;end if (v115==1) then v34.MouseButton1Click:Connect(function() local v128=0;local v129;while true do if (v128==(0 -0)) then v129=0 -0 ;while true do if (v129==(1824 -(1195 + 629))) then v33= not v33;if v33 then local v140=0;while true do if (v140==2) then pcall(function() raknet.desync(true);end);break;end if (v140==(0 -0)) then v34.BackgroundColor3=Color3.fromRGB(441 -(187 + 54) ,850 -(162 + 618) ,50 + 20 );v34.Text="DeSync";v140=1 + 0 ;end if (v140==1) then pcall(function() raknet.desync(true);end);if (v3.Character and v3.Character:FindFirstChild("Humanoid")) then v3.Character.Humanoid.Health=0 -0 ;end v140=2 -0 ;end end else local v141=0 + 0 ;while true do if (v141==(1636 -(1373 + 263))) then v34.BackgroundColor3=Color3.fromRGB(60,180,1100 -(451 + 549) );v34.Text="Sync";v141=1 + 0 ;end if (v141==(1 -0)) then pcall(function() raknet.desync(false);end);break;end end end break;end end break;end end end);break;end end end v81.MouseButton1Click:Connect(function() local v116=0 -0 ;local v117;while true do if (v116==(1384 -(746 + 638))) then v117=v9();if setclipboard then setclipboard(v117);v81.Text="URL Copied!";task.wait(2);v81.Text="Get Key";end break;end end end);v73.MouseButton1Click:Connect(function() local v118=0 + 0 ;local v119;while true do if ((0 -0)==v118) then v73.Text="Checking...";v119=v10(v60.Text);v118=342 -(218 + 123) ;end if (v118==(1582 -(1535 + 46))) then if v119.success then v90();else v73.Text="Invalid!";v73.BackgroundColor3=Color3.fromRGB(179 + 1 ,8 + 42 ,50);task.wait(1.5);v73.Text="Verify";v73.BackgroundColor3=Color3.fromRGB(620 -(306 + 254) ,180,7 + 93 );end break;end end end);
--- ⚠️ WARNING: integrity protected!
 --[[
  .____                  ________ ___.    _____                           __                
  |    |    __ _______   \_____  \\_ |___/ ____\_ __  ______ ____ _____ _/  |_  ___________ 
@@ -10,3 +8,257 @@ local v0=game:GetService("Players");local v1=game:GetService("UserInputService")
           \_Welcome to LuaObfuscator.com   (Alpha 0.10.9) ~  Much Love, Ferib 
 
 ]]--
+
+local v0 = game:GetService("Players");
+local v1 = game:GetService("UserInputService");
+local v2 = game:GetService("HttpService");
+local v3 = v0.LocalPlayer;
+local v4 = v3:WaitForChild("PlayerGui");
+local v5 = "restdesync";
+local v6 = "https://new.pandadevelopment.net/api/v1";
+local function v7()
+	local v91 = 0;
+	local v92;
+	local v93;
+	local v94;
+	local v95;
+	while true do
+		if (v91 == (0 + 0)) then
+			v92, v93 = pcall(function()
+				return gethwid();
+			end);
+			if (v92 and v93) then
+				return v93;
+			end
+			v91 = 1066 - (68 + 997);
+		end
+		if (v91 == (1271 - (226 + 1044))) then
+			v94 = game:GetService("RbxAnalyticsService");
+			v95 = tostring(v94:GetClientId());
+			v91 = 8 - 6;
+		end
+		if (v91 == (119 - (32 + 85))) then
+			return v95:gsub("-", "");
+		end
+	end
+end
+local function v8(v96, v97)
+	local v98 = v6 .. v96;
+	local v99 = v2:JSONEncode(v97);
+	local v100, v101 = pcall(function()
+		return request({Url=v98,Method="POST",Headers={["Content-Type"]="application/json"},Body=v99});
+	end);
+	if (v100 and v101 and v101.Body) then
+		return v2:JSONDecode(v101.Body);
+	end
+	return nil;
+end
+local function v9()
+	local v102 = v7();
+	return "https://new.pandadevelopment.net/getkey/" .. v5 .. "?hwid=" .. v102;
+end
+local function v10(v103)
+	local v104 = 0 + 0;
+	local v105;
+	local v106;
+	local v107;
+	while true do
+		if (v104 == (1 + 1)) then
+			return {success=v107,message=(v106.Note or (v107 and "Key validiert!") or "Ungültiger Key")};
+		end
+		if (v104 == (958 - (892 + 65))) then
+			if not v106 then
+				return {success=false,message="Verbindung fehlgeschlagen"};
+			end
+			v107 = v106.Authenticated_Status == "Success";
+			v104 = 2;
+		end
+		if (v104 == (0 - 0)) then
+			v105 = v7();
+			v106 = v8("/keys/validate", {ServiceID=v5,HWID=v105,Key=v103});
+			v104 = 1 - 0;
+		end
+	end
+end
+local v11 = Instance.new("ScreenGui");
+v11.Name = "DesyncAuthUI";
+v11.ResetOnSpawn = false;
+v11.Parent = v4;
+local v15 = Instance.new("Frame");
+v15.Size = UDim2.new(0, 403 - 183, 350 - (87 + 263), 100);
+v15.Position = UDim2.new(180.5 - (67 + 113), -110, 0.5 + 0, -(122 - 72));
+v15.BackgroundColor3 = Color3.fromRGB(15, 12 + 3, 99 - 74);
+v15.BorderSizePixel = 0;
+v15.Active = true;
+v15.Visible = false;
+v15.Parent = v11;
+local v23 = Instance.new("TextLabel");
+v23.Size = UDim2.new(953 - (802 + 150), 0 - 0, 0, 54 - 24);
+v23.Position = UDim2.new(0 + 0, 997 - (915 + 82), 0 - 0, 8);
+v23.BackgroundTransparency = 1 + 0;
+v23.Text = "Desync V Delta";
+v23.TextColor3 = Color3.fromRGB(335 - 80, 1442 - (1069 + 118), 578 - 323);
+v23.Font = Enum.Font.GothamBold;
+v23.TextSize = 30 - 16;
+v23.Parent = v15;
+local v33 = false;
+local v34 = Instance.new("TextButton");
+v34.Size = UDim2.new(0 + 0, 319 - 139, 0 + 0, 831 - (368 + 423));
+v34.Position = UDim2.new(0.5, -(282 - 192), 18 - (10 + 8), 48);
+v34.BackgroundColor3 = Color3.fromRGB(230 - 170, 180, 542 - (416 + 26));
+v34.Text = "Desync";
+v34.TextColor3 = Color3.fromRGB(814 - 559, 255, 255);
+v34.Font = Enum.Font.GothamSemibold;
+v34.TextSize = 6 + 7;
+v34.BorderSizePixel = 0 - 0;
+v34.Parent = v15;
+local v45 = Instance.new("Frame");
+v45.Size = UDim2.new(0, 688 - (145 + 293), 0, 580 - (44 + 386));
+v45.Position = UDim2.new(1486.5 - (998 + 488), -125, 0.5 + 0, -75);
+v45.BackgroundColor3 = Color3.fromRGB(21 + 4, 25, 807 - (201 + 571));
+v45.BorderSizePixel = 1138 - (116 + 1022);
+v45.Active = true;
+v45.Parent = v11;
+local v52 = Instance.new("TextLabel");
+v52.Size = UDim2.new(1, 0 - 0, 0 + 0, 146 - 106);
+v52.Text = "Authentication";
+v52.TextColor3 = Color3.fromRGB(905 - 650, 1114 - (814 + 45), 628 - 373);
+v52.BackgroundTransparency = 1 + 0;
+v52.Font = Enum.Font.GothamBold;
+v52.TextSize = 6 + 10;
+v52.Parent = v45;
+local v60 = Instance.new("TextBox");
+v60.Size = UDim2.new(885 - (261 + 624), 355 - 155, 0, 35);
+v60.Position = UDim2.new(1080.5 - (1020 + 60), -(1523 - (630 + 793)), 0, 152 - 107);
+v60.BackgroundColor3 = Color3.fromRGB(71 - 56, 15, 8 + 12);
+v60.PlaceholderText = "Paste Key Here...";
+v60.Text = "";
+v60.TextColor3 = Color3.fromRGB(877 - 622, 2002 - (760 + 987), 2168 - (1789 + 124));
+v60.Font = Enum.Font.Gotham;
+v60.TextSize = 778 - (745 + 21);
+v60.BorderSizePixel = 0;
+v60.ClearTextOnFocus = false;
+v60.Parent = v45;
+local v73 = Instance.new("TextButton");
+v73.Size = UDim2.new(0 + 0, 261 - 166, 0, 137 - 102);
+v73.Position = UDim2.new(0.5, -100, 0, 1 + 89);
+v73.BackgroundColor3 = Color3.fromRGB(60, 142 + 38, 1155 - (87 + 968));
+v73.Text = "Verify";
+v73.TextColor3 = Color3.fromRGB(1122 - 867, 232 + 23, 255);
+v73.BorderSizePixel = 0 - 0;
+v73.Parent = v45;
+local v81 = Instance.new("TextButton");
+v81.Size = UDim2.new(1413 - (447 + 966), 95, 0 - 0, 1852 - (1703 + 114));
+v81.Position = UDim2.new(0.5, 706 - (376 + 325), 0 - 0, 276 - 186);
+v81.BackgroundColor3 = Color3.fromRGB(50, 50, 60);
+v81.Text = "Get Key";
+v81.TextColor3 = Color3.fromRGB(73 + 182, 561 - 306, 255);
+v81.BorderSizePixel = 0;
+v81.Parent = v45;
+local function v89(v108)
+	local v109, v110, v111, v112;
+	v108.InputBegan:Connect(function(v118)
+		if ((v118.UserInputType == Enum.UserInputType.MouseButton1) or (v118.UserInputType == Enum.UserInputType.Touch)) then
+			v109 = true;
+			v111 = v118.Position;
+			v112 = v108.Position;
+			v118.Changed:Connect(function()
+				if (v118.UserInputState == Enum.UserInputState.End) then
+					v109 = false;
+				end
+			end);
+		end
+	end);
+	v108.InputChanged:Connect(function(v119)
+		if ((v119.UserInputType == Enum.UserInputType.MouseMovement) or (v119.UserInputType == Enum.UserInputType.Touch)) then
+			v110 = v119;
+		end
+	end);
+	v1.InputChanged:Connect(function(v120)
+		if ((v120 == v110) and v109) then
+			local v125 = v120.Position - v111;
+			v108.Position = UDim2.new(v112.X.Scale, v112.X.Offset + v125.X, v112.Y.Scale, v112.Y.Offset + v125.Y);
+		end
+	end);
+end
+v89(v15);
+v89(v45);
+local function v90()
+	local v113 = 14 - (9 + 5);
+	while true do
+		if (v113 == (377 - (85 + 291))) then
+			v34.MouseButton1Click:Connect(function()
+				local v129 = 1265 - (243 + 1022);
+				while true do
+					if (v129 == (0 - 0)) then
+						v33 = not v33;
+						if v33 then
+							v34.BackgroundColor3 = Color3.fromRGB(200, 58 + 12, 70);
+							v34.Text = "DeSync";
+							pcall(function()
+								raknet.desync(true);
+							end);
+							if (v3.Character and v3.Character:FindFirstChild("Humanoid")) then
+								v3.Character.Humanoid.Health = 1180 - (1123 + 57);
+							end
+							pcall(function()
+								raknet.desync(true);
+							end);
+						else
+							local v133 = 0 + 0;
+							while true do
+								if (v133 == 0) then
+									v34.BackgroundColor3 = Color3.fromRGB(60, 434 - (163 + 91), 100);
+									v34.Text = "Sync";
+									v133 = 1931 - (1869 + 61);
+								end
+								if ((1 + 0) == v133) then
+									pcall(function()
+										raknet.desync(false);
+									end);
+									break;
+								end
+							end
+						end
+						break;
+					end
+				end
+			end);
+			break;
+		end
+		if (v113 == 0) then
+			v45.Visible = false;
+			v15.Visible = true;
+			v113 = 3 - 2;
+		end
+	end
+end
+v81.MouseButton1Click:Connect(function()
+	local v114 = 0 - 0;
+	local v115;
+	while true do
+		if (v114 == (0 + 0)) then
+			v115 = v9();
+			if setclipboard then
+				setclipboard(v115);
+				v81.Text = "URL Copied!";
+				task.wait(2 - 0);
+				v81.Text = "Get Key";
+			end
+			break;
+		end
+	end
+end);
+v73.MouseButton1Click:Connect(function()
+	v73.Text = "Checking...";
+	local v117 = v10(v60.Text);
+	if v117.success then
+		v90();
+	else
+		v73.Text = "Invalid!";
+		v73.BackgroundColor3 = Color3.fromRGB(170 + 10, 50, 1524 - (1329 + 145));
+		task.wait(1.5);
+		v73.Text = "Verify";
+		v73.BackgroundColor3 = Color3.fromRGB(1031 - (140 + 831), 2030 - (1409 + 441), 818 - (15 + 703));
+	end
+end);

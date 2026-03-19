@@ -1,0 +1,74 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ModernUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 220, 0, 100)
+Frame.Position = UDim2.new(0.5, -110, 0.5, -50)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = Frame
+
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Position = UDim2.new(0, 0, 0, 8)
+Title.BackgroundTransparency = 1
+Title.Text = "Desync V Delta"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = Frame
+
+
+local isActivated = false
+
+local Button = Instance.new("TextButton")
+Button.Size = UDim2.new(0, 180, 0, 40)
+Button.Position = UDim2.new(0.5, -90, 0, 48)
+Button.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
+Button.Text = "Desync"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.Font = Enum.Font.GothamSemibold
+Button.TextSize = 13
+Button.BorderSizePixel = 0
+Button.Parent = Frame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 8)
+BtnCorner.Parent = Button
+
+local function activate()
+    raknet.desync(true)
+    game.Players.LocalPlayer.Character.Humanoid.Health = 0
+    raknet.desync(true)
+end
+
+local function deactivate()
+    raknet.desync(false)
+end
+
+Button.MouseButton1Click:Connect(function()
+    isActivated = not isActivated
+
+    if isActivated then
+        Button.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
+        Button.Text = "DeSync"
+        activate()
+    else
+        Button.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
+        Button.Text = "Sync"
+        deactivate()
+    end
+end)

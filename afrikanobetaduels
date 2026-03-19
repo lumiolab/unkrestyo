@@ -1,0 +1,831 @@
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║              RestDuels  v1.0  by void                   ║
+-- ║         Cross-Platform: Delta / Xeno / Synapse          ║
+-- ╚══════════════════════════════════════════════════════════╝
+
+-- ── Executor Detection ────────────────────────────────────────
+local executor = (identifyexecutor and identifyexecutor()) or
+                 (syn and "Synapse") or
+                 (DELTA_EXECUTOR and "Delta") or
+                 (XENO_EXECUTOR and "Xeno") or
+                 "Unknown"
+
+-- ── Services ──────────────────────────────────────────────────
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local TweenService   = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui        = game:GetService("CoreGui")
+
+local LocalPlayer    = Players.LocalPlayer
+local Character      = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP            = Character:WaitForChild("HumanoidRootPart")
+local Humanoid       = Character:WaitForChild("Humanoid")
+
+-- ── Remote ────────────────────────────────────────────────────
+local Net            = game:GetService("ReplicatedStorage"):WaitForChild("Net")
+local GrabRemote     = Net:WaitForChild("RE/StealService/Grab")
+
+-- ── Config ────────────────────────────────────────────────────
+local Config = {
+    Speed          = 60,       -- studs/s travel speed
+    WaypointSize   = 1.5,      -- radius of waypoint markers
+    FireDelay      = 0.15,     -- seconds before firing at last point
+    AutoWalk       = true,     -- move character to waypoints
+    LoopAutoplay   = false,
+    WaypointColor  = Color3.fromRGB(220, 50, 50),
+    ActiveColor    = Color3.fromRGB(255, 200, 0),
+}
+
+-- ── State ─────────────────────────────────────────────────────
+local waypoints   = {}   -- { position = Vector3, marker = Part }
+local isRunning   = false
+local runThread   = nil
+local markerFolder = nil
+
+-- ══════════════════════════════════════════════════════════════
+--  WAYPOINT SYSTEM
+-- ══════════════════════════════════════════════════════════════
+
+local function ensureFolder()
+    if markerFolder and markerFolder.Parent then return end
+    markerFolder = Instance.new("Folder")
+    markerFolder.Name = "RestDuels_Markers"
+    markerFolder.Parent = workspace
+end
+
+local function createMarker(pos, index)
+    ensureFolder()
+    local part = Instance.new("Part")
+    part.Name          = "WP_" .. index
+    part.Size          = Vector3.new(Config.WaypointSize, Config.WaypointSize, Config.WaypointSize)
+    part.Shape         = Enum.PartType.Ball
+    part.Material      = Enum.Material.Neon
+    part.Color         = Config.WaypointColor
+    part.Anchored      = true
+    part.CanCollide    = false
+    part.CastShadow    = false
+    part.CFrame        = CFrame.new(pos)
+    part.Parent        = markerFolder
+
+    -- Floating label
+    local bg = Instance.new("BillboardGui", part)
+    bg.Size            = UDim2.new(0, 40, 0, 20)
+    bg.AlwaysOnTop     = true
+    bg.StudsOffset     = Vector3.new(0, 1.8, 0)
+    local lbl = Instance.new("TextLabel", bg)
+    lbl.Size           = UDim2.fromScale(1, 1)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3     = Color3.fromRGB(255, 220, 0)
+    lbl.TextScaled     = true
+    lbl.Font           = Enum.Font.GothamBold
+    lbl.Text           = "#" .. index
+    return part
+end
+
+local function addWaypoint(pos)
+    local idx = #waypoints + 1
+    local marker = createMarker(pos, idx)
+    table.insert(waypoints, { position = pos, marker = marker })
+    return idx
+end
+
+local function clearWaypoints()
+    for _, wp in ipairs(waypoints) do
+        if wp.marker and wp.marker.Parent then
+            wp.marker:Destroy()
+        end
+    end
+    waypoints = {}
+end
+
+local function highlightWaypoint(idx, active)
+    local wp = waypoints[idx]
+    if not wp or not wp.marker then return end
+    wp.marker.Color = active and Config.ActiveColor or Config.WaypointColor
+    wp.marker.Size  = active
+        and Vector3.new(Config.WaypointSize * 1.6, Config.WaypointSize * 1.6, Config.WaypointSize * 1.6)
+        or  Vector3.new(Config.WaypointSize, Config.WaypointSize, Config.WaypointSize)
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  AUTOPLAY CORE
+-- ══════════════════════════════════════════════════════════════
+
+local function travelTo(targetPos)
+    if not Config.AutoWalk then return end
+    local dist   = (HRP.Position - targetPos).Magnitude
+    local steps  = math.max(1, math.floor(dist / (Config.Speed * 0.05)))
+    local origin = HRP.Position
+
+    for i = 1, steps do
+        if not isRunning then return false end
+        local alpha = i / steps
+        HRP.CFrame = CFrame.new(origin:Lerp(targetPos, alpha))
+        task.wait(0.05)
+    end
+    HRP.CFrame = CFrame.new(targetPos)
+    return true
+end
+
+local function fireGrab()
+    -- Fire RE/StealService/Grab with the nearest grabbable target
+    -- Adjust args to match the game's expected parameters
+    local target = nil
+    local minDist = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local d = (HRP.Position - hrp.Position).Magnitude
+                if d < minDist then
+                    minDist = d
+                    target  = p.Character
+                end
+            end
+        end
+    end
+
+    if target then
+        GrabRemote:FireServer(target)
+    else
+        GrabRemote:FireServer()
+    end
+end
+
+local function autoplay()
+    if isRunning then return end
+    if #waypoints == 0 then
+        warn("[RestDuels] No waypoints set!")
+        return
+    end
+
+    isRunning = true
+
+    runThread = task.spawn(function()
+        repeat
+            for idx, wp in ipairs(waypoints) do
+                if not isRunning then break end
+
+                highlightWaypoint(idx, true)
+
+                -- Travel
+                local ok = travelTo(wp.position)
+                task.wait(0.05)
+
+                -- Fire at last waypoint
+                if ok ~= false and idx == #waypoints then
+                    task.wait(Config.FireDelay)
+                    if isRunning then
+                        fireGrab()
+                    end
+                end
+
+                highlightWaypoint(idx, false)
+                task.wait(0.1)
+            end
+        until not isRunning or not Config.LoopAutoplay
+
+        isRunning = false
+    end)
+end
+
+local function stopAutoplay()
+    isRunning = false
+    if runThread then
+        task.cancel(runThread)
+        runThread = nil
+    end
+    -- Reset all markers
+    for i = 1, #waypoints do
+        highlightWaypoint(i, false)
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  GUI
+-- ══════════════════════════════════════════════════════════════
+
+-- Remove old GUI
+pcall(function()
+    CoreGui:FindFirstChild("RestDuelsGUI"):Destroy()
+end)
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name            = "RestDuelsGUI"
+ScreenGui.ResetOnSpawn    = false
+ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder    = 999
+ScreenGui.Parent          = (syn and syn.protect_gui and syn.protect_gui(ScreenGui)) and CoreGui
+                            or (gethui and gethui()) or CoreGui
+
+-- ── Palette ───────────────────────────────────────────────────
+local C = {
+    bg        = Color3.fromRGB(18, 18, 20),
+    panel     = Color3.fromRGB(26, 26, 30),
+    card      = Color3.fromRGB(32, 32, 38),
+    border    = Color3.fromRGB(50, 50, 60),
+    yellow    = Color3.fromRGB(255, 210, 0),
+    yellowDim = Color3.fromRGB(200, 160, 0),
+    red       = Color3.fromRGB(220, 60, 60),
+    green     = Color3.fromRGB(60, 200, 100),
+    text      = Color3.fromRGB(230, 230, 235),
+    textDim   = Color3.fromRGB(130, 130, 145),
+    white     = Color3.fromRGB(255, 255, 255),
+}
+
+-- ── Helpers ───────────────────────────────────────────────────
+local function corner(r, p) local c=Instance.new("UICorner",p) c.CornerRadius=UDim.new(0,r) end
+local function stroke(t, c2, p) local s=Instance.new("UIStroke",p) s.Thickness=t s.Color=c2 end
+local function padding(a,b,c3,d,p)
+    local pad=Instance.new("UIPadding",p)
+    pad.PaddingTop=UDim.new(0,a) pad.PaddingBottom=UDim.new(0,b)
+    pad.PaddingLeft=UDim.new(0,c3) pad.PaddingRight=UDim.new(0,d)
+end
+
+local function gradient(c1, c2, rot, p)
+    local g = Instance.new("UIGradient", p)
+    g.Color    = ColorSequence.new(c1, c2)
+    g.Rotation = rot
+end
+
+local function label(txt, size, color, font, parent)
+    local l = Instance.new("TextLabel", parent)
+    l.BackgroundTransparency = 1
+    l.Text      = txt
+    l.TextSize  = size
+    l.TextColor3= color
+    l.Font      = font or Enum.Font.GothamBold
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.AutomaticSize  = Enum.AutomaticSize.XY
+    return l
+end
+
+local function makeButton(txt, parent, bgColor)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size             = UDim2.new(1, 0, 0, 34)
+    btn.BackgroundColor3 = bgColor or C.yellow
+    btn.TextColor3       = Color3.fromRGB(15,15,15)
+    btn.Text             = txt
+    btn.TextSize         = 13
+    btn.Font             = Enum.Font.GothamBold
+    btn.AutoButtonColor  = false
+    corner(8, btn)
+
+    -- Hover effect
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = Color3.fromRGB(255,225,60)
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = bgColor or C.yellow
+        }):Play()
+    end)
+    btn.MouseButton1Down:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.06), {
+            Size = UDim2.new(1,-4,0,32)
+        }):Play()
+    end)
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.06), {
+            Size = UDim2.new(1,0,0,34)
+        }):Play()
+    end)
+    return btn
+end
+
+-- ── Main Frame ────────────────────────────────────────────────
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size              = UDim2.new(0, 280, 0, 420)
+Main.Position          = UDim2.new(0.5, -140, 0.5, -210)
+Main.BackgroundColor3  = C.bg
+Main.BorderSizePixel   = 0
+Main.ClipDescendants   = true
+corner(14, Main)
+stroke(1.2, C.border, Main)
+
+-- Subtle top accent bar
+local accentBar = Instance.new("Frame", Main)
+accentBar.Size             = UDim2.new(1, 0, 0, 3)
+accentBar.Position         = UDim2.new(0,0,0,0)
+accentBar.BackgroundColor3 = C.yellow
+accentBar.BorderSizePixel  = 0
+gradient(C.yellow, C.yellowDim, 0, accentBar)
+
+-- ── Title Bar ─────────────────────────────────────────────────
+local TitleBar = Instance.new("Frame", Main)
+TitleBar.Size              = UDim2.new(1, 0, 0, 52)
+TitleBar.Position          = UDim2.new(0,0,0,3)
+TitleBar.BackgroundTransparency = 1
+
+local Logo = Instance.new("Frame", TitleBar)
+Logo.Size              = UDim2.new(0,32,0,32)
+Logo.Position          = UDim2.new(0,14,0,10)
+Logo.BackgroundColor3  = C.yellow
+corner(8, Logo)
+local logoLbl = Instance.new("TextLabel", Logo)
+logoLbl.Size           = UDim2.fromScale(1,1)
+logoLbl.BackgroundTransparency = 1
+logoLbl.Text           = "R"
+logoLbl.TextColor3     = Color3.fromRGB(15,15,15)
+logoLbl.Font           = Enum.Font.GothamBlack
+logoLbl.TextSize       = 18
+
+local titleTxt = Instance.new("TextLabel", TitleBar)
+titleTxt.Position      = UDim2.new(0, 56, 0, 8)
+titleTxt.Size          = UDim2.new(0,160,0,18)
+titleTxt.BackgroundTransparency = 1
+titleTxt.Text          = "RestDuels"
+titleTxt.TextColor3    = C.white
+titleTxt.Font          = Enum.Font.GothamBlack
+titleTxt.TextSize      = 17
+titleTxt.TextXAlignment = Enum.TextXAlignment.Left
+
+local subTxt = Instance.new("TextLabel", TitleBar)
+subTxt.Position        = UDim2.new(0, 57, 0, 28)
+subTxt.Size            = UDim2.new(0,200,0,14)
+subTxt.BackgroundTransparency = 1
+subTxt.Text            = executor .. "  •  v1.0"
+subTxt.TextColor3      = C.textDim
+subTxt.Font            = Enum.Font.Gotham
+subTxt.TextSize        = 11
+subTxt.TextXAlignment  = Enum.TextXAlignment.Left
+
+-- Drag logic
+local dragging, dragStart, startPos
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging  = true
+        dragStart = i.Position
+        startPos  = Main.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = i.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- ── Divider ───────────────────────────────────────────────────
+local div1 = Instance.new("Frame", Main)
+div1.Size              = UDim2.new(1,-28,0,1)
+div1.Position          = UDim2.new(0,14,0,55)
+div1.BackgroundColor3  = C.border
+div1.BorderSizePixel   = 0
+
+-- ── Content Scroll ────────────────────────────────────────────
+local Scroll = Instance.new("ScrollingFrame", Main)
+Scroll.Size            = UDim2.new(1,0,1,-57)
+Scroll.Position        = UDim2.new(0,0,0,57)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 3
+Scroll.ScrollBarImageColor3 = C.yellowDim
+Scroll.BorderSizePixel = 0
+Scroll.CanvasSize      = UDim2.new(0,0,0,0)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local Layout = Instance.new("UIListLayout", Scroll)
+Layout.Padding         = UDim.new(0,10)
+Layout.SortOrder       = Enum.SortOrder.LayoutOrder
+padding(12,16,14,14,Scroll)
+
+-- ── Section Builder ───────────────────────────────────────────
+local function section(title)
+    local s = Instance.new("Frame", Scroll)
+    s.Size              = UDim2.new(1,0,0,0)
+    s.AutomaticSize     = Enum.AutomaticSize.Y
+    s.BackgroundColor3  = C.card
+    s.BorderSizePixel   = 0
+    corner(10, s)
+    padding(10,12,12,12,s)
+    local sl = Instance.new("UIListLayout", s)
+    sl.Padding          = UDim.new(0,8)
+    sl.SortOrder        = Enum.SortOrder.LayoutOrder
+
+    local hdr = Instance.new("Frame", s)
+    hdr.Size            = UDim2.new(1,0,0,18)
+    hdr.BackgroundTransparency = 1
+    hdr.LayoutOrder     = 0
+    local hl = Instance.new("TextLabel", hdr)
+    hl.Size             = UDim2.fromScale(1,1)
+    hl.BackgroundTransparency = 1
+    hl.Text             = title:upper()
+    hl.TextColor3       = C.yellow
+    hl.Font             = Enum.Font.GothamBold
+    hl.TextSize         = 10
+    hl.TextXAlignment   = Enum.TextXAlignment.Left
+    hl.LetterSpacing    = 2
+
+    return s
+end
+
+-- ══════════════════════════════════════════════════════════════
+-- SECTION: Autoplay
+-- ══════════════════════════════════════════════════════════════
+local autoSec = section("⚡  Autoplay")
+
+-- Status badge
+local statusRow = Instance.new("Frame", autoSec)
+statusRow.Size           = UDim2.new(1,0,0,28)
+statusRow.BackgroundColor3 = C.panel
+statusRow.LayoutOrder    = 1
+corner(8, statusRow)
+
+local statusDot = Instance.new("Frame", statusRow)
+statusDot.Size           = UDim2.new(0,8,0,8)
+statusDot.Position       = UDim2.new(0,10,0.5,-4)
+statusDot.BackgroundColor3 = C.red
+statusDot.BorderSizePixel = 0
+corner(4, statusDot)
+
+local statusLbl = Instance.new("TextLabel", statusRow)
+statusLbl.Position       = UDim2.new(0,26,0,0)
+statusLbl.Size           = UDim2.new(1,-26,1,0)
+statusLbl.BackgroundTransparency = 1
+statusLbl.Text           = "Idle  —  0 waypoints"
+statusLbl.TextColor3     = C.textDim
+statusLbl.Font           = Enum.Font.Gotham
+statusLbl.TextSize       = 12
+statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local function updateStatus()
+    if isRunning then
+        statusDot.BackgroundColor3 = C.green
+        statusLbl.Text  = "Running  —  " .. #waypoints .. " waypoints"
+        statusLbl.TextColor3 = C.green
+    else
+        statusDot.BackgroundColor3 = C.red
+        statusLbl.Text  = "Idle  —  " .. #waypoints .. " waypoints"
+        statusLbl.TextColor3 = C.textDim
+    end
+end
+
+-- Play / Stop buttons
+local btnRow = Instance.new("Frame", autoSec)
+btnRow.Size              = UDim2.new(1,0,0,34)
+btnRow.BackgroundTransparency = 1
+btnRow.LayoutOrder       = 2
+local btnLayout = Instance.new("UIListLayout", btnRow)
+btnLayout.FillDirection  = Enum.FillDirection.Horizontal
+btnLayout.Padding        = UDim.new(0,8)
+
+local playBtn = makeButton("▶  Start Autoplay", btnRow, C.yellow)
+playBtn.Size             = UDim2.new(0.62,-4,1,0)
+
+local stopBtn = makeButton("■  Stop", btnRow, C.panel)
+stopBtn.TextColor3       = C.red
+stopBtn.Size             = UDim2.new(0.38,-4,1,0)
+stroke(1, C.red, stopBtn)
+
+playBtn.MouseButton1Click:Connect(function()
+    autoplay()
+    updateStatus()
+end)
+stopBtn.MouseButton1Click:Connect(function()
+    stopAutoplay()
+    updateStatus()
+end)
+
+-- Loop toggle
+local loopRow = Instance.new("Frame", autoSec)
+loopRow.Size             = UDim2.new(1,0,0,26)
+loopRow.BackgroundTransparency = 1
+loopRow.LayoutOrder      = 3
+
+local loopLbl = Instance.new("TextLabel", loopRow)
+loopLbl.Size             = UDim2.new(0.7,0,1,0)
+loopLbl.BackgroundTransparency = 1
+loopLbl.Text             = "Loop Autoplay"
+loopLbl.TextColor3       = C.text
+loopLbl.Font             = Enum.Font.Gotham
+loopLbl.TextSize         = 13
+loopLbl.TextXAlignment   = Enum.TextXAlignment.Left
+
+local loopToggle = Instance.new("TextButton", loopRow)
+loopToggle.Size          = UDim2.new(0,44,0,22)
+loopToggle.Position      = UDim2.new(1,-44,0.5,-11)
+loopToggle.BackgroundColor3 = C.border
+loopToggle.Text          = ""
+loopToggle.AutoButtonColor = false
+corner(11, loopToggle)
+local loopNub = Instance.new("Frame", loopToggle)
+loopNub.Size             = UDim2.new(0,18,0,18)
+loopNub.Position         = UDim2.new(0,2,0.5,-9)
+loopNub.BackgroundColor3 = C.textDim
+corner(9, loopNub)
+
+loopToggle.MouseButton1Click:Connect(function()
+    Config.LoopAutoplay = not Config.LoopAutoplay
+    TweenService:Create(loopToggle, TweenInfo.new(0.15), {
+        BackgroundColor3 = Config.LoopAutoplay and C.yellow or C.border
+    }):Play()
+    TweenService:Create(loopNub, TweenInfo.new(0.15), {
+        Position = Config.LoopAutoplay and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9),
+        BackgroundColor3 = Config.LoopAutoplay and Color3.fromRGB(15,15,15) or C.textDim
+    }):Play()
+end)
+
+-- ══════════════════════════════════════════════════════════════
+-- SECTION: Waypoints
+-- ══════════════════════════════════════════════════════════════
+local wpSec = section("📍  Waypoints")
+
+-- Waypoint list display
+local wpListFrame = Instance.new("ScrollingFrame", wpSec)
+wpListFrame.Size         = UDim2.new(1,0,0,90)
+wpListFrame.BackgroundColor3 = C.panel
+wpListFrame.BorderSizePixel = 0
+wpListFrame.ScrollBarThickness = 2
+wpListFrame.ScrollBarImageColor3 = C.yellow
+wpListFrame.LayoutOrder  = 1
+corner(8, wpListFrame)
+wpListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+wpListFrame.CanvasSize   = UDim2.new(0,0,0,0)
+
+local wpListLayout = Instance.new("UIListLayout", wpListFrame)
+wpListLayout.Padding     = UDim.new(0,2)
+padding(4,4,6,6,wpListFrame)
+
+local wpEmpty = Instance.new("TextLabel", wpListFrame)
+wpEmpty.Size             = UDim2.new(1,0,0,20)
+wpEmpty.BackgroundTransparency = 1
+wpEmpty.Text             = "No waypoints — add below"
+wpEmpty.TextColor3       = C.textDim
+wpEmpty.Font             = Enum.Font.Gotham
+wpEmpty.TextSize         = 12
+
+local function refreshWpList()
+    for _, c in ipairs(wpListFrame:GetChildren()) do
+        if c:IsA("Frame") then c:Destroy() end
+    end
+    wpEmpty.Visible = #waypoints == 0
+
+    for i, wp in ipairs(waypoints) do
+        local row = Instance.new("Frame", wpListFrame)
+        row.Size             = UDim2.new(1,0,0,22)
+        row.BackgroundColor3 = Color3.fromRGB(40,40,48)
+        row.BorderSizePixel  = 0
+        corner(6, row)
+
+        local num = Instance.new("TextLabel", row)
+        num.Size             = UDim2.new(0,22,1,0)
+        num.BackgroundTransparency = 1
+        num.Text             = tostring(i)
+        num.TextColor3       = C.yellow
+        num.Font             = Enum.Font.GothamBold
+        num.TextSize         = 11
+
+        local pos = wp.position
+        local coord = Instance.new("TextLabel", row)
+        coord.Position       = UDim2.new(0,24,0,0)
+        coord.Size           = UDim2.new(1,-46,1,0)
+        coord.BackgroundTransparency = 1
+        coord.Text           = string.format("%.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z)
+        coord.TextColor3     = C.textDim
+        coord.Font           = Enum.Font.Code
+        coord.TextSize       = 11
+        coord.TextXAlignment = Enum.TextXAlignment.Left
+
+        -- Fire badge on last
+        if i == #waypoints then
+            local badge = Instance.new("TextLabel", row)
+            badge.Position   = UDim2.new(1,-38,0.5,-8)
+            badge.Size       = UDim2.new(0,36,0,16)
+            badge.BackgroundColor3 = C.yellow
+            badge.Text       = "FIRE"
+            badge.TextColor3 = Color3.fromRGB(15,15,15)
+            badge.Font       = Enum.Font.GothamBold
+            badge.TextSize   = 9
+            corner(4, badge)
+        end
+    end
+    updateStatus()
+end
+
+-- Add at player pos
+local addBtn = makeButton("＋  Add Current Position", wpSec, C.panel)
+addBtn.TextColor3 = C.yellow
+addBtn.LayoutOrder = 2
+stroke(1, C.yellow, addBtn)
+
+addBtn.MouseButton1Click:Connect(function()
+    addWaypoint(HRP.Position)
+    refreshWpList()
+end)
+
+-- Clear
+local clearBtn = makeButton("✕  Clear All Waypoints", wpSec, C.panel)
+clearBtn.TextColor3 = C.red
+clearBtn.LayoutOrder = 3
+stroke(1, C.red, clearBtn)
+
+clearBtn.MouseButton1Click:Connect(function()
+    stopAutoplay()
+    clearWaypoints()
+    refreshWpList()
+end)
+
+-- ══════════════════════════════════════════════════════════════
+-- SECTION: Settings
+-- ══════════════════════════════════════════════════════════════
+local setsSec = section("⚙  Settings")
+
+local function sliderRow(lbl_txt, min, max, current, onChange)
+    local row = Instance.new("Frame", setsSec)
+    row.Size             = UDim2.new(1,0,0,48)
+    row.BackgroundTransparency = 1
+
+    local top = Instance.new("Frame", row)
+    top.Size             = UDim2.new(1,0,0,18)
+    top.BackgroundTransparency = 1
+
+    local nameLbl = Instance.new("TextLabel", top)
+    nameLbl.Size         = UDim2.new(0.7,0,1,0)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text         = lbl_txt
+    nameLbl.TextColor3   = C.text
+    nameLbl.Font         = Enum.Font.Gotham
+    nameLbl.TextSize     = 13
+    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local valLbl = Instance.new("TextLabel", top)
+    valLbl.Size          = UDim2.new(0.3,0,1,0)
+    valLbl.Position      = UDim2.new(0.7,0,0,0)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Text          = tostring(current)
+    valLbl.TextColor3    = C.yellow
+    valLbl.Font          = Enum.Font.GothamBold
+    valLbl.TextSize       = 13
+    valLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+    local track = Instance.new("Frame", row)
+    track.Size           = UDim2.new(1,0,0,6)
+    track.Position       = UDim2.new(0,0,0,26)
+    track.BackgroundColor3 = C.border
+    track.BorderSizePixel = 0
+    corner(3, track)
+
+    local fill = Instance.new("Frame", track)
+    fill.Size            = UDim2.new((current-min)/(max-min),0,1,0)
+    fill.BackgroundColor3 = C.yellow
+    fill.BorderSizePixel  = 0
+    corner(3, fill)
+
+    local nub = Instance.new("TextButton", track)
+    nub.Size             = UDim2.new(0,14,0,14)
+    nub.Position         = UDim2.new((current-min)/(max-min),0,0.5,-7)
+    nub.AnchorPoint      = Vector2.new(0.5,0)
+    nub.BackgroundColor3 = C.yellow
+    nub.Text             = ""
+    nub.AutoButtonColor  = false
+    nub.ZIndex           = 2
+    corner(7, nub)
+    stroke(1.5, Color3.fromRGB(15,15,15), nub)
+
+    local sliding = false
+    nub.MouseButton1Down:Connect(function() sliding = true end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            sliding = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if sliding and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local rel = (i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X
+            rel = math.clamp(rel, 0, 1)
+            local val = math.floor(min + rel*(max-min))
+            valLbl.Text = tostring(val)
+            fill.Size   = UDim2.new(rel,0,1,0)
+            nub.Position = UDim2.new(rel,0,0.5,-7)
+            onChange(val)
+        end
+    end)
+
+    return row
+end
+
+sliderRow("Travel Speed (st/s)", 10, 200, Config.Speed, function(v)
+    Config.Speed = v
+end).LayoutOrder = 1
+
+sliderRow("Fire Delay (×10ms)", 1, 50, math.floor(Config.FireDelay*100), function(v)
+    Config.FireDelay = v/100
+end).LayoutOrder = 2
+
+-- AutoWalk toggle
+local awRow = Instance.new("Frame", setsSec)
+awRow.Size               = UDim2.new(1,0,0,26)
+awRow.BackgroundTransparency = 1
+awRow.LayoutOrder        = 3
+
+local awLbl = Instance.new("TextLabel", awRow)
+awLbl.Size               = UDim2.new(0.7,0,1,0)
+awLbl.BackgroundTransparency = 1
+awLbl.Text               = "Auto-Walk to Waypoints"
+awLbl.TextColor3         = C.text
+awLbl.Font               = Enum.Font.Gotham
+awLbl.TextSize           = 13
+awLbl.TextXAlignment     = Enum.TextXAlignment.Left
+
+local awToggle = Instance.new("TextButton", awRow)
+awToggle.Size            = UDim2.new(0,44,0,22)
+awToggle.Position        = UDim2.new(1,-44,0.5,-11)
+awToggle.AutoButtonColor = false
+awToggle.Text            = ""
+awToggle.BackgroundColor3 = C.yellow  -- starts ON
+corner(11, awToggle)
+
+local awNub = Instance.new("Frame", awToggle)
+awNub.Size               = UDim2.new(0,18,0,18)
+awNub.Position           = UDim2.new(1,-20,0.5,-9)
+awNub.BackgroundColor3   = Color3.fromRGB(15,15,15)
+corner(9, awNub)
+
+awToggle.MouseButton1Click:Connect(function()
+    Config.AutoWalk = not Config.AutoWalk
+    TweenService:Create(awToggle, TweenInfo.new(0.15), {
+        BackgroundColor3 = Config.AutoWalk and C.yellow or C.border
+    }):Play()
+    TweenService:Create(awNub, TweenInfo.new(0.15), {
+        Position = Config.AutoWalk and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9),
+        BackgroundColor3 = Config.AutoWalk and Color3.fromRGB(15,15,15) or C.textDim
+    }):Play()
+end)
+
+-- ══════════════════════════════════════════════════════════════
+-- Footer
+-- ══════════════════════════════════════════════════════════════
+local footerSep = Instance.new("Frame", Scroll)
+footerSep.Size           = UDim2.new(1,0,0,1)
+footerSep.BackgroundColor3 = C.border
+footerSep.BorderSizePixel = 0
+
+local footer = Instance.new("TextLabel", Scroll)
+footer.Size              = UDim2.new(1,0,0,20)
+footer.BackgroundTransparency = 1
+footer.Text              = "RestDuels  •  RE/StealService/Grab"
+footer.TextColor3        = Color3.fromRGB(60,60,70)
+footer.Font              = Enum.Font.Gotham
+footer.TextSize          = 10
+
+-- Close button
+local closeBtn = Instance.new("TextButton", Main)
+closeBtn.Size            = UDim2.new(0,22,0,22)
+closeBtn.Position        = UDim2.new(1,-30,0,14)
+closeBtn.BackgroundColor3 = Color3.fromRGB(50,50,58)
+closeBtn.Text            = "✕"
+closeBtn.TextColor3      = C.textDim
+closeBtn.Font            = Enum.Font.GothamBold
+closeBtn.TextSize        = 11
+closeBtn.AutoButtonColor = false
+corner(6, closeBtn)
+
+closeBtn.MouseEnter:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.1), {
+        BackgroundColor3 = C.red,
+        TextColor3 = C.white
+    }):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.1), {
+        BackgroundColor3 = Color3.fromRGB(50,50,58),
+        TextColor3 = C.textDim
+    }):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function()
+    stopAutoplay()
+    ScreenGui:Destroy()
+end)
+
+-- Open/toggle keybind: RightAlt
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.KeyCode == Enum.KeyCode.RightAlt then
+        Main.Visible = not Main.Visible
+    end
+end)
+
+-- Initial refresh
+refreshWpList()
+updateStatus()
+
+-- Entrance animation
+Main.Position = UDim2.new(0.5,-140,0.5,-190)
+Main.BackgroundTransparency = 1
+TweenService:Create(Main, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {
+    Position = UDim2.new(0.5,-140,0.5,-210),
+    BackgroundTransparency = 0
+}):Play()
+
+print(string.format("[RestDuels] Loaded on %s  •  Toggle: RightAlt", executor))

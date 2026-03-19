@@ -1,0 +1,314 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local TouchEnabled = UserInputService.TouchEnabled
+
+-- Master Configuration
+local CONFIG_FILE = "RestHubBooster_Config.json"
+local CONFIG = {
+    GUI_POSITION = {X = 0.5, Y = 0.5},
+    SPEED = {Normal = 16, Stealing = 50}
+}
+
+local function LoadConfig()
+    if isfile and isfile(CONFIG_FILE) then
+        local success, data = pcall(function() return HttpService:JSONDecode(readfile(CONFIG_FILE)) end)
+        if success and data then
+            CONFIG.GUI_POSITION = data.GUI_POSITION or CONFIG.GUI_POSITION
+            CONFIG.SPEED = data.SPEED or CONFIG.SPEED
+        end
+    end
+end
+
+local function SaveConfig()
+    if writefile then
+        pcall(function() writefile(CONFIG_FILE, HttpService:JSONEncode(CONFIG)) end)
+    end
+end
+
+LoadConfig()
+
+-- Core GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RestHubBooster_UI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local success = pcall(function() ScreenGui.Parent = CoreGui:FindFirstChild("RobloxGui") or CoreGui end)
+if not success then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 220, 0, 320)
+MainFrame.Position = UDim2.new(CONFIG.GUI_POSITION.X, 0, CONFIG.GUI_POSITION.Y, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 40, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+
+local UIGradient = Instance.new("UIGradient", MainFrame)
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 80, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 180, 80))
+}
+UIGradient.Rotation = 45
+
+local UIStroke = Instance.new("UIStroke", MainFrame)
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(0, 255, 100)
+UIStroke.Transparency = 0.3
+
+-- Title
+local TitleLabel = Instance.new("TextLabel", MainFrame)
+TitleLabel.Size = UDim2.new(1, -30, 0, 30)
+TitleLabel.Position = UDim2.new(0, 10, 0, 5)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "RestHubBooster"
+TitleLabel.Font = Enum.Font.GothamBlack
+TitleLabel.TextSize = 15
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+CloseBtn.Position = UDim2.new(1, -29, 0, 8)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Text = "X"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+-- UI Helper Function with Hotbar Fix
+local function createInput(yPos, labelText, defaultValue)
+    local label = Instance.new("TextLabel", MainFrame)
+    label.Size = UDim2.new(0, 190, 0, 15)
+    label.Position = UDim2.new(0, 15, 0, yPos)
+    label.Text = labelText
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 12
+    label.TextColor3 = Color3.fromRGB(200, 255, 200)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local box = Instance.new("TextBox", MainFrame)
+    box.Size = UDim2.new(0, 190, 0, 25)
+    box.Position = UDim2.new(0, 15, 0, yPos + 18)
+    box.Text = tostring(defaultValue)
+    box.Font = Enum.Font.Gotham
+    box.BackgroundColor3 = Color3.fromRGB(0, 30, 15)
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", box).Color = Color3.fromRGB(0, 255, 100)
+    
+    -- Strip non-numbers
+    box:GetPropertyChangedSignal("Text"):Connect(function()
+        box.Text = box.Text:gsub("%D+", "")
+    end)
+
+    -- HOTBAR FIX: Disable backpack when typing so numbers don't equip items
+    box.Focused:Connect(function()
+        pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) end)
+    end)
+    box.FocusLost:Connect(function()
+        pcall(function() StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, true) end)
+    end)
+
+    return box
+end
+
+-- === SPEED SECTION ===
+local normalInput = createInput(45, "Normal Speed", CONFIG.SPEED.Normal)
+local stealingInput = createInput(95, "Stealing Speed", CONFIG.SPEED.Stealing)
+
+local SpeedToggle = Instance.new("TextButton", MainFrame)
+SpeedToggle.Size = UDim2.new(0, 190, 0, 30)
+SpeedToggle.Position = UDim2.new(0, 15, 0, 145)
+SpeedToggle.BackgroundColor3 = Color3.fromRGB(0, 80, 40)
+SpeedToggle.Text = "SPEED: NORMAL"
+SpeedToggle.Font = Enum.Font.GothamBold
+SpeedToggle.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", SpeedToggle).CornerRadius = UDim.new(0, 6)
+
+local isStealing = false
+local activeSpeed = CONFIG.SPEED.Normal
+
+SpeedToggle.MouseButton1Click:Connect(function()
+    isStealing = not isStealing
+    CONFIG.SPEED.Normal = tonumber(normalInput.Text) or 16
+    CONFIG.SPEED.Stealing = tonumber(stealingInput.Text) or 50
+    SaveConfig()
+
+    if isStealing then
+        SpeedToggle.Text = "SPEED: STEALING"
+        SpeedToggle.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        activeSpeed = CONFIG.SPEED.Stealing
+    else
+        SpeedToggle.Text = "SPEED: NORMAL"
+        SpeedToggle.BackgroundColor3 = Color3.fromRGB(0, 80, 40)
+        activeSpeed = CONFIG.SPEED.Normal
+    end
+end)
+
+-- Improved Anti-Rubberband Velocity Loop
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChild("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    -- Only override physics if a custom speed is active
+    if hum and root and activeSpeed > 16 then
+        if hum.MoveDirection.Magnitude > 0 then
+            -- Apply direct velocity based on camera direction
+            local targetVelocity = hum.MoveDirection * activeSpeed
+            root.AssemblyLinearVelocity = Vector3.new(targetVelocity.X, root.AssemblyLinearVelocity.Y, targetVelocity.Z)
+        else
+            -- ANTI-RUBBERBAND FIX: Kill momentum instantly when you stop pressing keys
+            root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+        end
+    end
+end)
+
+-- === ANTI-LAG SECTION ===
+local Divider = Instance.new("Frame", MainFrame)
+Divider.Size = UDim2.new(0, 190, 0, 2)
+Divider.Position = UDim2.new(0, 15, 0, 190)
+Divider.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+Divider.BorderSizePixel = 0
+
+local function createFeatureBtn(yPos, text)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0, 190, 0, 30)
+    btn.Position = UDim2.new(0, 15, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 60, 30)
+    btn.Text = text
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    btn.TextColor3 = Color3.fromRGB(0, 255, 100)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", btn).Color = Color3.fromRGB(0, 255, 100)
+    return btn
+end
+
+local UltraButton = createFeatureBtn(205, "ULTRA ANTI-LAG")
+local FPSButton = createFeatureBtn(245, "FPS BOOSTER")
+
+-- Anti-Lag Functions
+local GreenTint = Instance.new("ColorCorrectionEffect")
+GreenTint.Enabled = false
+GreenTint.TintColor = Color3.fromRGB(180, 255, 180)
+GreenTint.Parent = Camera
+
+local function DestroyAllEffects()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        pcall(function()
+            if obj:IsA("ParticleEmitter") or obj:IsA("Beam") or obj:IsA("Trail") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Explosion") then
+                obj.Enabled = false
+                obj:Destroy()
+            end
+        end)
+    end
+end
+
+local function DestroyAnimations()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        pcall(function()
+            if obj:IsA("Animation") or obj:IsA("Animator") or obj:IsA("AnimationController") then obj:Destroy() end
+        end)
+    end
+    if LocalPlayer.Character then
+        for _, obj in ipairs(LocalPlayer.Character:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("Animation") or obj:IsA("Animator") or obj:IsA("AnimationController") then obj:Destroy() end
+            end)
+        end
+    end
+end
+
+task.spawn(function()
+    while true do task.wait(0.8) DestroyAnimations() end
+end)
+
+local function OptimizeLighting()
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 12
+    Lighting.FogEnd = 1000
+    Lighting.GlobalShadows = false
+    Lighting.Outlines = false
+end
+
+UltraButton.MouseButton1Click:Connect(function()
+    UltraButton.Text = "OPTIMIZING..."
+    task.spawn(function()
+        DestroyAllEffects()
+        OptimizeLighting()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        settings().Rendering.Shadows = false
+        for _, effect in ipairs(Camera:GetChildren()) do
+            if effect:IsA("BloomEffect") or effect:IsA("DepthOfField") or effect:IsA("ColorCorrectionEffect") then
+                effect.Enabled = false
+            end
+        end
+        UltraButton.Text = "OPTIMIZED"
+        task.wait(2)
+        UltraButton.Text = "ULTRA ANTI-LAG"
+    end)
+end)
+
+FPSButton.MouseButton1Click:Connect(function()
+    FPSButton.Text = "BOOSTING..."
+    task.spawn(function()
+        DestroyAllEffects()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        settings().Rendering.AntiAliasing = false
+        settings().Rendering.Shadows = false
+        Lighting.GlobalShadows = false
+        GreenTint.Enabled = true
+        FPSButton.Text = "FPS MAXED"
+        task.wait(2)
+        FPSButton.Text = "FPS BOOSTER"
+    end)
+end)
+
+-- === CUSTOM DRAGGING LOGIC ===
+local dragging, mousePos, framePos, touchId = false, nil, nil, nil
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or (TouchEnabled and input.UserInputType == Enum.UserInputType.Touch) then
+        dragging = true
+        mousePos = input.Position
+        framePos = MainFrame.Position
+        if TouchEnabled and input.UserInputType == Enum.UserInputType.Touch then touchId = input.KeyCode end
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or (TouchEnabled and input.UserInputType == Enum.UserInputType.Touch and input.KeyCode == touchId)) then
+        local delta = input.Position - mousePos
+        local newX = math.clamp(framePos.X.Offset + delta.X, -MainFrame.AbsoluteSize.X * 0.5, Camera.ViewportSize.X - MainFrame.AbsoluteSize.X * 0.5)
+        local newY = math.clamp(framePos.Y.Offset + delta.Y, 0, Camera.ViewportSize.Y - MainFrame.AbsoluteSize.Y)
+        MainFrame.Position = UDim2.new(framePos.X.Scale, newX, framePos.Y.Scale, newY)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or (TouchEnabled and input.UserInputType == Enum.UserInputType.Touch and input.KeyCode == touchId) then
+        dragging = false
+        touchId = nil
+        CONFIG.GUI_POSITION = {X = MainFrame.Position.X.Scale, Y = MainFrame.Position.Y.Scale}
+        SaveConfig()
+    end
+end)
+
+-- Save when leaving
+LocalPlayer.CharacterRemoving:Connect(SaveConfig)

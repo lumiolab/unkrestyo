@@ -1,25 +1,25 @@
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-
+-- UI Setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ModernUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
-
 
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.new(0, 220, 0, 100)
 Frame.Position = UDim2.new(0.5, -110, 0.5, -50)
 Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 Frame.BorderSizePixel = 0
+Frame.Active = true -- Important for dragging
 Frame.Parent = ScreenGui
 
 local Corner = Instance.new("UICorner")
 Corner.CornerRadius = UDim.new(0, 12)
 Corner.Parent = Frame
-
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
@@ -30,7 +30,6 @@ Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.Parent = Frame
-
 
 local isActivated = false
 
@@ -49,6 +48,7 @@ local BtnCorner = Instance.new("UICorner")
 BtnCorner.CornerRadius = UDim.new(0, 8)
 BtnCorner.Parent = Button
 
+-- Functionality (Kept your logic)
 local function activate()
     raknet.desync(true)
     game.Players.LocalPlayer.Character.Humanoid.Health = 0
@@ -61,7 +61,6 @@ end
 
 Button.MouseButton1Click:Connect(function()
     isActivated = not isActivated
-
     if isActivated then
         Button.BackgroundColor3 = Color3.fromRGB(200, 70, 70)
         Button.Text = "DeSync"
@@ -70,5 +69,43 @@ Button.MouseButton1Click:Connect(function()
         Button.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
         Button.Text = "Sync"
         deactivate()
+    end
+end)
+
+--- DRAGGABLE LOGIC ---
+
+local dragging
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
     end
 end)

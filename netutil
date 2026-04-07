@@ -1,0 +1,41 @@
+local NetUtil = {}
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net")
+
+local function isRemote(obj)
+	return obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")
+end
+
+local function isHashedName(name)
+	return string.match(name, "^R[FE]/%x+$") ~= nil
+end
+
+function NetUtil.GetHashedRemote(readableName)
+	local list = Net:GetDescendants()
+
+	for i, obj in ipairs(list) do
+		if isRemote(obj) and obj.Name == readableName then
+			local nextObj = list[i + 1]
+			if nextObj and isRemote(nextObj) and isHashedName(nextObj.Name) then
+				return nextObj
+			end
+
+			local prevObj = list[i - 1]
+			if prevObj and isRemote(prevObj) and isHashedName(prevObj.Name) then
+				return prevObj
+			end
+
+			return nil
+		end
+	end
+
+	return nil
+end
+
+function NetUtil.GetHashedName(readableName)
+	local remote = NetUtil.GetHashedRemote(readableName)
+	return remote and remote.Name or nil
+end
+
+return NetUtil

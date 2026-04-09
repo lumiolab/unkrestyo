@@ -469,13 +469,15 @@ function ModernUI.newToggle(options: ToggleOptions)
 	local state = options.Default == true
 
 	local function render()
-		quickTween(switch, {
-			BackgroundColor3 = state and (options.Color or ModernUI.Theme.Accent) or ModernUI.Theme.Border,
-		}):Play()
-		quickTween(knob, {
-			Position = state and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2),
-		}):Play()
-		(holder :: any).State = state
+	    quickTween(switch, {
+	        BackgroundColor3 = state and (options.Color or ModernUI.Theme.Accent) or ModernUI.Theme.Border,
+	    }):Play()
+	
+	    quickTween(knob, {
+	        Position = state and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2),
+	    }):Play()
+	
+	    toggle.State = state
 	end
 
 	render()
